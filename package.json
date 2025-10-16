@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node src/server.js"
   },
   "keywords": [
     "palworld",
@@ -17,6 +17,6 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "docker-api": "^1.4.0"
+    "dockerode": "^2.6.10"
   }
 }

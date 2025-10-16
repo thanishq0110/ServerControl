@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
-const Docker = require('docker-api');
-const fs = require('fs');
+const Docker = require('dockerode');
 
 const app = express();
 const PORT = 3000;
@@ -18,7 +17,7 @@ app.get('/api/servers', async (req, res) => {
   try {
     const containers = await docker.listContainers({ all: true });
     const servers = containers
-      .filter(c => c.Names[0].includes('palworld-server-'))
+      .filter(c => c.Names && c.Names[0] && c.Names[0].includes('palworld-server-'))
       .map(c => ({
         id: c.Id.substring(0, 12),
         name: c.Names[0].replace('/', ''),
@@ -53,7 +52,7 @@ app.post('/api/servers', async (req, res) => {
     
     for (let p = 8211; p < 8300; p++) {
       const portTaken = existingContainers.some(c => 
-        c.Ports && c.Ports.some(port => port.PublicPort === p)
+        c.Ports && c.Ports.some(portInfo => portInfo.PublicPort === p)
       );
       if (!portTaken) {
         port = p;
@@ -66,6 +65,10 @@ app.post('/api/servers', async (req, res) => {
       return res.status(400).json({ error: 'No available ports' });
     }
 
+    // Pull the latest image first
+    console.log('Pulling latest Palworld server image...');
+    await docker.pull('thijsvanloef/palworld-server-docker:latest');
+
     const container = await docker.createContainer({
       Image: 'thijsvanloef/palworld-server-docker:latest',
       name: containerName,
@@ -74,6 +77,9 @@ app.post('/api/servers', async (req, res) => {
           '8211/udp': [{ HostPort: port.toString() }]
         },
         Memory: 6442450944 // 6GB
+      },
+      ExposedPorts: {
+        '8211/udp': {}
       },
       Env: [
         `SERVER_NAME=${serverName}`,
@@ -120,7 +126,7 @@ app.post('/api/servers/:id/start', async (req, res) => {
 app.post('/api/servers/:id/stop', async (req, res) => {
   try {
     const container = docker.getContainer(req.params.id);
-    await container.stop();
+    await container.stop({ t: 30 });
     res.json({ success: true, message: 'Server stopped' });
   } catch (error) {
     console.error('Error stopping server:', error);
@@ -135,7 +141,7 @@ app.delete('/api/servers/:id', async (req, res) => {
     
     // Stop if running
     try {
-      await container.stop();
+      await container.stop({ t: 10 });
     } catch (e) {
       // Already stopped
     }
@@ -154,7 +160,12 @@ app.delete('/api/servers/:id', async (req, res) => {
 app.get('/api/servers/:id/logs', async (req, res) => {
   try {
     const container = docker.getContainer(req.params.id);
-    const logs = await container.logs({ stdout: true, stderr: true });
+    const logs = await container.logs({ 
+      stdout: true, 
+      stderr: true,
+      follow: false,
+      tail: 100
+    });
     res.json({ logs: logs.toString() });
   } catch (error) {
     console.error('Error fetching logs:', error);

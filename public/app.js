@@ -70,24 +70,39 @@ function renderServers() {
 
     serversList.innerHTML = servers.map(server => {
         const isRunning = server.status === 'running';
-        const portInfo = server.ports && server.ports.length > 0 
-            ? server.ports.map(p => `${p.PublicPort || '?'}/${p.Type}`).join(', ')
-            : 'Not mapped';
+        const detailStatus = server.detailStatus || 'Unknown';
+        const statusBadgeColor = 
+            detailStatus === 'Running' ? 'status-running' :
+            detailStatus === 'Installing' ? 'status-installing' :
+            'status-stopped';
+        
+        const statusIcon = 
+            detailStatus === 'Running' ? '✅' :
+            detailStatus === 'Installing' ? '⏳' :
+            '⛔';
 
         return `
             <div class="server-item">
                 <div class="server-info">
-                    <div class="server-name">${server.name}</div>
-                    <div class="server-status">
-                        <span class="status-badge ${isRunning ? 'status-running' : 'status-stopped'}">
-                            <span class="status-dot ${isRunning ? 'running' : 'stopped'}"></span>
-                            ${isRunning ? 'Running' : 'Stopped'}
+                    <div class="server-header">
+                        <div class="server-name">${server.name}</div>
+                        <span class="status-badge ${statusBadgeColor}">
+                            <span class="status-dot"></span>
+                            ${statusIcon} ${detailStatus}
                         </span>
                     </div>
+                    <div class="server-connection-info">
+                        ${server.gamePort ? `
+                            <div class="connection-detail">
+                                <strong>🎮 Join:</strong> <code>${server.publicIP}:${server.gamePort}</code>
+                                <button class="copy-btn" onclick="copyToClipboard('${server.publicIP}:${server.gamePort}')">📋</button>
+                            </div>
+                        ` : ''}
+                    </div>
                     <div class="server-details">
-                        <span><strong>Container ID:</strong> ${server.id}</span>
+                        <span><strong>ID:</strong> ${server.id}</span>
+                        <span><strong>Port:</strong> ${server.gamePort || 'N/A'}</span>
                         <span><strong>Status:</strong> ${server.state}</span>
-                        <span><strong>Ports:</strong> ${portInfo}</span>
                     </div>
                 </div>
                 <div class="server-actions">
@@ -263,6 +278,21 @@ function showMessage(element, message, type) {
             element.className = 'message';
         }, 5000);
     }
+}
+
+// Copy to clipboard
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Show feedback
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }).catch(() => {
+        alert('Failed to copy to clipboard');
+    });
 }
 
 // Close modal on outside click

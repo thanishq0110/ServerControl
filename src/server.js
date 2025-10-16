@@ -3,6 +3,7 @@ const path = require('path');
 const Docker = require('dockerode');
 const fs = require('fs');
 const os = require('os');
+const { execSync } = require('child_process');
 
 const app = express();
 const PORT = 3000;
@@ -17,24 +18,92 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 fs.chmodSync(DATA_DIR, 0o777);
 
+// Helper function to get public IP
+function getPublicIP() {
+  try {
+    // Try to get the host IP from Docker
+    return execSync("hostname -I | awk '{print $1}'").toString().trim() || 'localhost';
+  } catch (error) {
+    return 'localhost';
+  }
+}
+
+// Helper function to detect server status from logs
+async function getServerStatus(containerId) {
+  try {
+    const container = docker.getContainer(containerId);
+    const logs = await container.logs({ 
+      stdout: true, 
+      stderr: true,
+      follow: false,
+      tail: 200
+    });
+    const logsText = logs.toString();
+    
+    // Check for specific patterns in logs
+    if (logsText.includes('Running Palworld dedicated server')) {
+      return 'Running';
+    } else if (logsText.includes('Starting Installation') || 
+               logsText.includes('Downloading update') ||
+               logsText.includes('Installing update') ||
+               logsText.includes('Extracting package')) {
+      return 'Installing';
+    } else if (logsText.includes('[S_API FAIL]') && !logsText.includes('Running Palworld')) {
+      return 'Installing';
+    }
+    return 'Starting';
+  } catch (error) {
+    console.error('Error getting server status:', error);
+    return 'Unknown';
+  }
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Get all running servers
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
+
+// Get all running servers with detailed status
 app.get('/api/servers', async (req, res) => {
   try {
     const containers = await docker.listContainers({ all: true });
-    const servers = containers
-      .filter(c => c.Names && c.Names[0] && c.Names[0].includes('palworld-server-'))
-      .map(c => ({
-        id: c.Id.substring(0, 12),
-        name: c.Names[0].replace('/', ''),
-        status: c.State,
-        state: c.Status,
-        ports: c.Ports || [],
-        image: c.Image
-      }));
+    const publicIP = getPublicIP();
+    
+    const servers = await Promise.all(
+      containers
+        .filter(c => c.Names && c.Names[0] && c.Names[0].includes('palworld-server-'))
+        .map(async (c) => {
+          const isRunning = c.State === 'running';
+          let detailStatus = 'Stopped';
+          
+          if (isRunning) {
+            detailStatus = await getServerStatus(c.Id);
+          }
+          
+          // Extract game port
+          let gamePort = null;
+          if (c.Ports && c.Ports.length > 0) {
+            const udpPort = c.Ports.find(p => p.Type === 'udp' && p.PublicPort);
+            gamePort = udpPort ? udpPort.PublicPort : null;
+          }
+          
+          return {
+            id: c.Id.substring(0, 12),
+            name: c.Names[0].replace('/', ''),
+            status: c.State,
+            detailStatus: detailStatus,
+            state: c.Status,
+            ports: c.Ports || [],
+            gamePort: gamePort,
+            publicIP: publicIP,
+            image: c.Image
+          };
+        })
+    );
     
     res.json(servers);
   } catch (error) {

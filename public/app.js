@@ -4,6 +4,24 @@ const API_BASE = '/api';
 // State
 let servers = [];
 let currentServerId = null;
+let isLoading = false;
+
+// Helper functions for loading
+function showLoading(message = 'Loading...') {
+    isLoading = true;
+    const overlay = document.getElementById('loadingOverlay');
+    document.getElementById('loadingText').textContent = message;
+    overlay.classList.add('show');
+}
+
+function hideLoading() {
+    isLoading = false;
+    document.getElementById('loadingOverlay').classList.remove('show');
+}
+
+function setLoadingText(message) {
+    document.getElementById('loadingText').textContent = message;
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,7 +29,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('createServerForm').addEventListener('submit', handleCreateServer);
     
     // Auto-refresh servers every 5 seconds
-    setInterval(loadServers, 5000);
+    setInterval(() => {
+        if (!isLoading) {
+            loadServers();
+        }
+    }, 5000);
 });
 
 // Load and display servers
@@ -91,6 +113,7 @@ async function handleCreateServer(e) {
     const serverPassword = document.getElementById('serverPassword').value.trim();
     const maxPlayers = document.getElementById('maxPlayers').value;
     const messageDiv = document.getElementById('createMessage');
+    const createBtn = document.getElementById('createBtn');
     
     if (!serverName) {
         showMessage(messageDiv, 'Server name is required', 'error');
@@ -98,6 +121,9 @@ async function handleCreateServer(e) {
     }
 
     try {
+        createBtn.disabled = true;
+        showLoading(`Creating server "${serverName}"...`);
+        
         const response = await fetch(`${API_BASE}/servers`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -114,23 +140,48 @@ async function handleCreateServer(e) {
             throw new Error(data.error || 'Failed to create server');
         }
 
-        showMessage(messageDiv, `✓ Server created! Port: ${data.server.port}`, 'success');
+        hideLoading();
+        showMessage(messageDiv, `✓ Server created on port ${data.server.port}! Installing...`, 'success');
         document.getElementById('createServerForm').reset();
         
-        // Reload servers
-        setTimeout(loadServers, 1000);
+        // Start polling for updates
+        setLoadingText('Server is being installed and started...');
+        showLoading('Server is being installed and started...');
+        
+        // Reload servers frequently for first 30 seconds
+        let pollCount = 0;
+        const pollInterval = setInterval(() => {
+            pollCount++;
+            loadServers();
+            
+            if (pollCount >= 6) { // 30 seconds (5 second intervals)
+                clearInterval(pollInterval);
+                hideLoading();
+            }
+        }, 5000);
+        
     } catch (error) {
+        hideLoading();
         showMessage(messageDiv, `✗ ${error.message}`, 'error');
+    } finally {
+        createBtn.disabled = false;
     }
 }
 
 // Start server
 async function startServer(serverId) {
     try {
+        showLoading('Starting server...');
         const response = await fetch(`${API_BASE}/servers/${serverId}/start`, { method: 'POST' });
         if (!response.ok) throw new Error('Failed to start server');
+        
+        setLoadingText('Server is starting...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        hideLoading();
         loadServers();
     } catch (error) {
+        hideLoading();
         alert(`Error: ${error.message}`);
     }
 }
@@ -138,10 +189,17 @@ async function startServer(serverId) {
 // Stop server
 async function stopServer(serverId) {
     try {
+        showLoading('Stopping server...');
         const response = await fetch(`${API_BASE}/servers/${serverId}/stop`, { method: 'POST' });
         if (!response.ok) throw new Error('Failed to stop server');
+        
+        setLoadingText('Server is shutting down...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        hideLoading();
         loadServers();
     } catch (error) {
+        hideLoading();
         alert(`Error: ${error.message}`);
     }
 }
@@ -153,10 +211,17 @@ async function deleteServer(serverId) {
     }
 
     try {
+        showLoading('Deleting server...');
         const response = await fetch(`${API_BASE}/servers/${serverId}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete server');
+        
+        setLoadingText('Server deleted. Refreshing...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        hideLoading();
         loadServers();
     } catch (error) {
+        hideLoading();
         alert(`Error: ${error.message}`);
     }
 }
@@ -172,10 +237,13 @@ async function viewLogs(serverId, serverName) {
     modal.classList.add('show');
     
     try {
+        showLoading('Fetching server logs...');
         const response = await fetch(`${API_BASE}/servers/${serverId}/logs`);
         const data = await response.json();
+        hideLoading();
         logContent.textContent = data.logs || 'No logs available';
     } catch (error) {
+        hideLoading();
         logContent.textContent = `Error loading logs: ${error.message}`;
     }
 }

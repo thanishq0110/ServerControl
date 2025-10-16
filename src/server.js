@@ -15,6 +15,7 @@ const DATA_DIR = path.join(os.homedir(), '.servercontrol', 'palworld-servers');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+fs.chmodSync(DATA_DIR, 0o777);
 
 // Middleware
 app.use(express.json());
@@ -77,18 +78,22 @@ app.post('/api/servers', async (req, res) => {
     console.log('Pulling latest Palworld server image...');
     await docker.pull('thijsvanloef/palworld-server-docker:latest');
 
-    // Create server-specific data directory
+    // Create server-specific data directory with proper permissions
     const serverDataDir = path.join(DATA_DIR, containerName);
     if (!fs.existsSync(serverDataDir)) {
       fs.mkdirSync(serverDataDir, { recursive: true });
     }
+    
+    // Make directory world-writable so container can access it
+    fs.chmodSync(serverDataDir, 0o777);
 
     const container = await docker.createContainer({
       Image: 'thijsvanloef/palworld-server-docker:latest',
       name: containerName,
       HostConfig: {
         PortBindings: {
-          '8211/udp': [{ HostPort: port.toString() }]
+          '8211/udp': [{ HostPort: port.toString() }],
+          '27015/udp': [{ HostPort: (port + 16804).toString() }]
         },
         Memory: 6442450944, // 6GB
         Binds: [
@@ -96,17 +101,23 @@ app.post('/api/servers', async (req, res) => {
         ]
       },
       ExposedPorts: {
-        '8211/udp': {}
+        '8211/udp': {},
+        '27015/udp': {}
       },
       Env: [
+        'PUID=1000',
+        'PGID=1000',
+        `PORT=8211`,
+        'QUERY_PORT=27015',
+        'MULTITHREADING=true',
+        'RCON_ENABLED=true',
+        'RCON_PORT=25575',
+        'TZ=UTC',
         `SERVER_NAME=${serverName}`,
         `SERVER_PASSWORD=${serverPassword || ''}`,
-        `MAX_PLAYERS=${maxPlayers || 32}`,
-        'Community=true',
-        'DIFFICULTY=None',
-        'DEATH_PENALTY_LOSS_RATE_DAMAGE=100',
-        'ENABLE_PVP=false',
-        'ENABLE_PLAYER_TO_PLAYER_DAMAGE=false'
+        `PLAYERS=${maxPlayers || 32}`,
+        'COMMUNITY=false',
+        'UPDATE_ON_BOOT=true'
       ]
     });
 

@@ -1,12 +1,20 @@
 const express = require('express');
 const path = require('path');
 const Docker = require('dockerode');
+const fs = require('fs');
+const os = require('os');
 
 const app = express();
 const PORT = 3000;
 
 // Initialize Docker connection
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+
+// Ensure persistent data directory exists
+const DATA_DIR = path.join(os.homedir(), '.servercontrol', 'palworld-servers');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 // Middleware
 app.use(express.json());
@@ -69,6 +77,12 @@ app.post('/api/servers', async (req, res) => {
     console.log('Pulling latest Palworld server image...');
     await docker.pull('thijsvanloef/palworld-server-docker:latest');
 
+    // Create server-specific data directory
+    const serverDataDir = path.join(DATA_DIR, containerName);
+    if (!fs.existsSync(serverDataDir)) {
+      fs.mkdirSync(serverDataDir, { recursive: true });
+    }
+
     const container = await docker.createContainer({
       Image: 'thijsvanloef/palworld-server-docker:latest',
       name: containerName,
@@ -76,7 +90,10 @@ app.post('/api/servers', async (req, res) => {
         PortBindings: {
           '8211/udp': [{ HostPort: port.toString() }]
         },
-        Memory: 6442450944 // 6GB
+        Memory: 6442450944, // 6GB
+        Binds: [
+          `${serverDataDir}:/palworld`
+        ]
       },
       ExposedPorts: {
         '8211/udp': {}

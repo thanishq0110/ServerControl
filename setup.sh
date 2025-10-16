@@ -67,19 +67,33 @@ else
     echo -e "${GREEN}✓ cloudflared is installed${NC}"
 fi
 
-# Step 4: Verify Node.js installation (needed for development)
+# Step 4: Verify Node.js installation and upgrade if needed
 echo -e "${YELLOW}Step 4: Checking Node.js...${NC}"
 if ! command -v node &> /dev/null; then
-    echo "Node.js not found. Installing..."
+    echo "Node.js not found. Installing Node.js 20 LTS..."
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install node
+        brew install node@20
+        brew link node@20 --force
     else
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y nodejs
     fi
-    echo -e "${GREEN}✓ Node.js installed${NC}"
+    echo -e "${GREEN}✓ Node.js 20 LTS installed${NC}"
 else
-    echo -e "${GREEN}✓ Node.js is installed: $(node --version)${NC}"
+    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -lt 14 ]; then
+        echo "Node.js version is too old (v$(node --version)). Upgrading to Node.js 20 LTS..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install node@20
+            brew link node@20 --force
+        else
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        fi
+        echo -e "${GREEN}✓ Node.js upgraded to $(node --version)${NC}"
+    else
+        echo -e "${GREEN}✓ Node.js is installed: $(node --version)${NC}"
+    fi
 fi
 
 # Step 5: Build Docker images

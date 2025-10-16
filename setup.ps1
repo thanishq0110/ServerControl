@@ -65,21 +65,35 @@ if (-not (Test-CommandExists -command cloudflared)) {
     Write-Host "✓ cloudflared is installed" -ForegroundColor Green
 }
 
-# Step 4: Verify Node.js installation
+# Step 4: Verify Node.js installation and upgrade if needed
 Write-Host "Step 4: Checking Node.js..." -ForegroundColor Yellow
 if (-not (Test-CommandExists -command node)) {
-    Write-Host "Node.js not found. Installing..."
+    Write-Host "Node.js not found. Installing Node.js 20 LTS..."
     
     if (Test-ChocoInstalled) {
-        choco install nodejs -y
+        choco install nodejs --version=20.0.0 -y
     } else {
-        Write-Host "Please install Node.js from: https://nodejs.org/" -ForegroundColor Red
+        Write-Host "Please install Node.js 20 LTS from: https://nodejs.org/" -ForegroundColor Red
         exit 1
     }
-    Write-Host "✓ Node.js installed" -ForegroundColor Green
+    Write-Host "✓ Node.js 20 LTS installed" -ForegroundColor Green
 } else {
-    $nodeVersion = node --version
-    Write-Host "✓ Node.js is installed: $nodeVersion" -ForegroundColor Green
+    $nodeVersion = node -v
+    $majorVersion = $nodeVersion -replace 'v(\d+)\..*', '$1'
+    
+    if ([int]$majorVersion -lt 14) {
+        Write-Host "Node.js version is too old ($nodeVersion). Upgrading to Node.js 20 LTS..." -ForegroundColor Yellow
+        
+        if (Test-ChocoInstalled) {
+            choco install nodejs --version=20.0.0 -y --force
+        } else {
+            Write-Host "Please upgrade Node.js 20 LTS from: https://nodejs.org/" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "✓ Node.js upgraded to $(node --version)" -ForegroundColor Green
+    } else {
+        Write-Host "✓ Node.js is installed: $nodeVersion" -ForegroundColor Green
+    }
 }
 
 # Step 5: Build Docker images

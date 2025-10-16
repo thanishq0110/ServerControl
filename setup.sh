@@ -69,35 +69,53 @@ fi
 
 # Step 4: Verify Node.js installation and upgrade if needed
 echo -e "${YELLOW}Step 4: Checking Node.js...${NC}"
-if ! command -v node &> /dev/null; then
-    echo "Node.js not found. Installing Node.js 20 LTS..."
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install node@20
-        brew link node@20 --force
-    else
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-        sudo apt-get install -y nodejs
+NODE_VERSION_CHECK=$(node -v 2>/dev/null || echo "v0.0.0")
+NODE_MAJOR=$(echo $NODE_VERSION_CHECK | cut -d'v' -f2 | cut -d'.' -f1)
+
+if [ "$NODE_MAJOR" -lt 14 ]; then
+    echo "Current Node.js version is too old ($NODE_VERSION_CHECK). Installing Node.js 20 LTS..."
+    
+    # Remove old nodejs packages
+    sudo apt-get remove -y nodejs npm 2>/dev/null || true
+    
+    # Install nvm first if not present
+    if ! command -v nvm &> /dev/null; then
+        echo "Installing nvm..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     fi
-    echo -e "${GREEN}✓ Node.js 20 LTS installed${NC}"
+    
+    # Install Node.js 20 LTS via nvm
+    source ~/.nvm/nvm.sh
+    nvm install 20
+    nvm use 20
+    nvm alias default 20
+    
+    # Verify installation
+    NODE_VERSION_NEW=$(node -v)
+    echo -e "${GREEN}✓ Node.js upgraded to $NODE_VERSION_NEW${NC}"
 else
-    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -lt 14 ]; then
-        echo "Node.js version is too old (v$(node --version)). Upgrading to Node.js 20 LTS..."
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            brew install node@20
-            brew link node@20 --force
-        else
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-        fi
-        echo -e "${GREEN}✓ Node.js upgraded to $(node --version)${NC}"
-    else
-        echo -e "${GREEN}✓ Node.js is installed: $(node --version)${NC}"
-    fi
+    echo -e "${GREEN}✓ Node.js is installed: $NODE_VERSION_CHECK${NC}"
+fi
+
+# Verify final Node.js version
+FINAL_NODE=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$FINAL_NODE" -lt 14 ]; then
+    echo -e "${RED}✗ Node.js is still outdated. Please manually install Node.js 20 LTS${NC}"
+    exit 1
 fi
 
 # Step 5: Build Docker images
 echo -e "${YELLOW}Step 5: Building Docker images...${NC}"
+
+# Clean npm cache to ensure fresh install with new Node.js
+echo "Cleaning npm cache..."
+npm cache clean --force
+
+# Ensure nvm is sourced for current shell
+[ -s "$HOME/.nvm/nvm.sh" ] && \. "$HOME/.nvm/nvm.sh"
+
 echo "Installing Node.js dependencies..."
 npm install --production
 

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServerControl - Palworld Manager</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>🎮 ServerControl</h1>
+                <p class="subtitle">Palworld Game Server Management Panel</p>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Create Server Section -->
+            <section class="card create-server-section">
+                <h2>Create New Server</h2>
+                <form id="createServerForm">
+                    <div class="form-group">
+                        <label for="serverName">Server Name *</label>
+                        <input type="text" id="serverName" placeholder="My Palworld Server" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="serverPassword">Password (optional)</label>
+                        <input type="password" id="serverPassword" placeholder="Leave empty for no password">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxPlayers">Max Players</label>
+                        <input type="number" id="maxPlayers" value="32" min="1" max="128">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Server</button>
+                </form>
+                <div id="createMessage" class="message"></div>
+            </section>
+
+            <!-- Servers List Section -->
+            <section class="card servers-section">
+                <h2>Running Servers</h2>
+                <div id="serversList" class="servers-list">
+                    <div class="loading">Loading servers...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>ServerControl v1.0 - Dockerized Palworld Server Management</p>
+        </footer>
+    </div>
+
+    <!-- Server Details Modal -->
+    <div id="logModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Server Logs</h3>
+                <button class="close-btn" onclick="closeLogModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logContent" class="log-content">Loading logs...</pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeLogModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

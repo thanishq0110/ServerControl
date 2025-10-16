@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  web-panel:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - NODE_ENV=production
+    networks:
+      - servercontrol-network
+    restart: unless-stopped
+    container_name: servercontrol-panel
+
+networks:
+  servercontrol-network:
+    driver: bridge

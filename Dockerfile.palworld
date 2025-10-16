@@ -1,0 +1,12 @@
+FROM thijsvanloef/palworld-server-docker:latest
+
+# The base image already includes all necessary Palworld server setup
+# Just expose the necessary ports
+EXPOSE 8211/udp
+EXPOSE 27015/udp
+EXPOSE 27016/udp
+EXPOSE 27020/udp
+EXPOSE 27030/udp
+EXPOSE 27031/udp
+EXPOSE 27032/udp
+EXPOSE 27033/udp

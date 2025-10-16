@@ -21,10 +21,22 @@ fs.chmodSync(DATA_DIR, 0o777);
 // Helper function to get public IP
 function getPublicIP() {
   try {
-    // Try to get the host IP from Docker
-    return execSync("hostname -I | awk '{print $1}'").toString().trim() || 'localhost';
+    // Try environment variable first
+    if (process.env.PUBLIC_IP) {
+      return process.env.PUBLIC_IP;
+    }
+    
+    // Try to get the host IP from Docker bridge network
+    const result = execSync("ip -4 addr show docker0 | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'").toString().trim();
+    if (result) {
+      return result;
+    }
+    
+    // Fallback: try default docker bridge gateway
+    return '172.17.0.1';
   } catch (error) {
-    return 'localhost';
+    // Last resort: return docker default
+    return '172.17.0.1';
   }
 }
 
@@ -71,7 +83,22 @@ app.get('/health', (req, res) => {
 app.get('/api/servers', async (req, res) => {
   try {
     const containers = await docker.listContainers({ all: true });
-    const publicIP = getPublicIP();
+    
+    // Get public IP from multiple sources
+    let publicIP = process.env.PUBLIC_IP;
+    
+    // If not set, try to get from request hostname
+    if (!publicIP) {
+      const host = req.get('host');
+      if (host) {
+        publicIP = host.split(':')[0]; // Remove port if present
+      }
+    }
+    
+    // If still not available, use getPublicIP()
+    if (!publicIP) {
+      publicIP = getPublicIP();
+    }
     
     const servers = await Promise.all(
       containers
@@ -84,11 +111,14 @@ app.get('/api/servers', async (req, res) => {
             detailStatus = await getServerStatus(c.Id);
           }
           
-          // Extract game port
+          // Extract game port (specifically 8211/udp)
           let gamePort = null;
           if (c.Ports && c.Ports.length > 0) {
-            const udpPort = c.Ports.find(p => p.Type === 'udp' && p.PublicPort);
-            gamePort = udpPort ? udpPort.PublicPort : null;
+            // Look specifically for the game port (8211/udp)
+            const gamePortMapping = c.Ports.find(p => 
+              p.Type === 'udp' && p.PrivatePort === 8211 && p.PublicPort
+            );
+            gamePort = gamePortMapping ? gamePortMapping.PublicPort : null;
           }
           
           return {
@@ -267,6 +297,84 @@ app.get('/api/servers/:id/logs', async (req, res) => {
   } catch (error) {
     console.error('Error fetching logs:', error);
     res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
+// Update server settings
+app.patch('/api/servers/:id/settings', async (req, res) => {
+  try {
+    const { settings } = req.body;
+    const container = docker.getContainer(req.params.id);
+    
+    // Get current container info
+    const containerInfo = await container.inspect();
+    const currentEnv = containerInfo.Config.Env || [];
+    
+    // Update environment variables based on settings
+    const newEnv = currentEnv.map(envVar => {
+      const [key] = envVar.split('=');
+      
+      if (key === 'SERVER_NAME' && settings.serverName) {
+        return `SERVER_NAME=${settings.serverName}`;
+      }
+      if (key === 'SERVER_PASSWORD' && settings.password !== undefined) {
+        return `SERVER_PASSWORD=${settings.password || ''}`;
+      }
+      if (key === 'PLAYERS' && settings.maxPlayers) {
+        return `PLAYERS=${settings.maxPlayers}`;
+      }
+      if (key === 'DIFFICULTY' && settings.difficulty) {
+        return `DIFFICULTY=${settings.difficulty}`;
+      }
+      
+      return envVar;
+    });
+    
+    // Add new settings if not already present
+    if (!currentEnv.some(e => e.startsWith('DIFFICULTY='))) {
+      newEnv.push(`DIFFICULTY=${settings.difficulty || 'Normal'}`);
+    }
+    
+    // Store settings in a metadata file for persistence
+    const settingsFile = path.join(os.homedir(), '.servercontrol', 'settings', `${req.params.id}.json`);
+    const settingsDir = path.dirname(settingsFile);
+    
+    if (!fs.existsSync(settingsDir)) {
+      fs.mkdirSync(settingsDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+    
+    res.json({ success: true, message: 'Settings saved. Restart the server for changes to take effect.' });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ error: 'Failed to update settings', details: error.message });
+  }
+});
+
+// Get server settings
+app.get('/api/servers/:id/settings', async (req, res) => {
+  try {
+    const settingsFile = path.join(os.homedir(), '.servercontrol', 'settings', `${req.params.id}.json`);
+    
+    if (fs.existsSync(settingsFile)) {
+      const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      res.json(settings);
+    } else {
+      res.json({
+        serverName: 'Unnamed Server',
+        description: '',
+        difficulty: 'Normal',
+        pvp: false,
+        lossItemsDecreasedDeath: false,
+        rconEnabled: true,
+        community: false,
+        updateOnBoot: true
+      });
+    }
+  } catch (error) {
+    console.error('Error reading settings:', error);
+    res.status(500).json({ error: 'Failed to read settings' });
   }
 });
 

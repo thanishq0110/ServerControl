@@ -7,70 +7,245 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-content">
-                <h1>🎮 ServerControl</h1>
-                <p class="subtitle">Palworld Game Server Management Panel</p>
+    <div class="layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">🎮 ServerControl</h1>
+                <p class="tagline">Palworld Manager</p>
             </div>
-        </header>
-
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="spinner"></div>
-            <p id="loadingText">Loading...</p>
-        </div>
-
-        <main class="main">
-            <!-- Create Server Section -->
-            <section class="card create-server-section">
-                <h2>Create New Server</h2>
-                <form id="createServerForm">
-                    <div class="form-group">
-                        <label for="serverName">Server Name *</label>
-                        <input type="text" id="serverName" placeholder="My Palworld Server" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="serverPassword">Password (optional)</label>
-                        <input type="password" id="serverPassword" placeholder="Leave empty for no password">
-                    </div>
-                    <div class="form-group">
-                        <label for="maxPlayers">Max Players</label>
-                        <input type="number" id="maxPlayers" value="32" min="1" max="128">
-                    </div>
-                    <button type="submit" id="createBtn" class="btn btn-primary">Create Server</button>
-                </form>
-                <div id="createMessage" class="message"></div>
-            </section>
-
-            <!-- Servers List Section -->
-            <section class="card servers-section">
-                <h2>Running Servers</h2>
-                <div id="serversList" class="servers-list">
-                    <div class="loading">Loading servers...</div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" onclick="switchTab('dashboard')">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" onclick="switchTab('servers')">
+                    <span class="icon">🖥️</span>
+                    <span>Servers</span>
+                </a>
+                <a href="#" class="nav-item" onclick="switchTab('create')">
+                    <span class="icon">➕</span>
+                    <span>New Server</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>System OK</span>
                 </div>
-            </section>
-        </main>
+            </div>
+        </aside>
 
-        <footer class="footer">
-            <p>ServerControl v1.0 - Dockerized Palworld Server Management</p>
-        </footer>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <h2 id="pageTitle">Dashboard</h2>
+                    <p id="pageSubtitle" class="header-subtitle">Monitor and manage your Palworld servers</p>
+                </div>
+                <div class="header-right">
+                    <div class="time-display" id="timeDisplay">--:--</div>
+                </div>
+            </header>
+
+            <!-- Content Container -->
+            <div class="content-container">
+                <!-- Dashboard Tab -->
+                <div id="dashboard-tab" class="tab-content active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🖥️</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Total Servers</div>
+                                <div class="stat-value" id="totalServers">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Running</div>
+                                <div class="stat-value" id="runningServers">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Installing</div>
+                                <div class="stat-value" id="installingServers">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⛔</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Stopped</div>
+                                <div class="stat-value" id="stoppedServers">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-activity">
+                        <h3>Recent Servers</h3>
+                        <div id="recentList" class="recent-servers-list"></div>
+                    </div>
+                </div>
+
+                <!-- Servers Tab -->
+                <div id="servers-tab" class="tab-content">
+                    <div id="serversList" class="servers-grid">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading servers...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Server Tab -->
+                <div id="create-tab" class="tab-content">
+                    <div class="create-server-card">
+                        <h3>Create New Palworld Server</h3>
+                        <form id="createServerForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="serverName">Server Name *</label>
+                                    <input type="text" id="serverName" placeholder="Enter server name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="maxPlayers">Max Players</label>
+                                    <input type="number" id="maxPlayers" value="32" min="1" max="128">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="serverPassword">Password (Optional)</label>
+                                    <input type="password" id="serverPassword" placeholder="Leave empty for public">
+                                </div>
+                                <div class="form-group">
+                                    <label for="serverDescription">Description</label>
+                                    <input type="text" id="serverDescription" placeholder="Server description">
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary btn-large">
+                                    <span>🚀</span> Create Server
+                                </button>
+                            </div>
+                        </form>
+                        <div id="createMessage" class="message"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <!-- Server Details Modal -->
-    <div id="logModal" class="modal">
-        <div class="modal-content">
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-overlay" onclick="closeSettingsModal()"></div>
+        <div class="modal-content settings-modal">
             <div class="modal-header">
-                <h3 id="modalTitle">Server Logs</h3>
-                <button class="close-btn" onclick="closeLogModal()">&times;</button>
+                <h2 id="settingsTitle">Server Settings</h2>
+                <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body settings-body">
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="switchSettingsTab('general')">General</button>
+                        <button class="tab-btn" onclick="switchSettingsTab('gameplay')">Gameplay</button>
+                        <button class="tab-btn" onclick="switchSettingsTab('server')">Server</button>
+                    </div>
+
+                    <!-- General Settings -->
+                    <div id="general-tab" class="settings-tab active">
+                        <div class="setting-group">
+                            <label>Server Name</label>
+                            <input type="text" id="set-serverName" placeholder="Server name">
+                        </div>
+                        <div class="setting-group">
+                            <label>Server Description</label>
+                            <textarea id="set-description" placeholder="Server description"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>Password</label>
+                            <input type="password" id="set-password" placeholder="Leave empty for public">
+                        </div>
+                    </div>
+
+                    <!-- Gameplay Settings -->
+                    <div id="gameplay-tab" class="settings-tab">
+                        <div class="setting-group">
+                            <label>Max Players</label>
+                            <input type="number" id="set-maxPlayers" min="1" max="128">
+                            <p class="setting-help">1-128 players</p>
+                        </div>
+                        <div class="setting-group">
+                            <label>Difficulty</label>
+                            <select id="set-difficulty">
+                                <option value="Normal">Normal</option>
+                                <option value="Hard">Hard</option>
+                            </select>
+                        </div>
+                        <div class="setting-group checkbox">
+                            <input type="checkbox" id="set-pvp">
+                            <label for="set-pvp">Enable PvP</label>
+                        </div>
+                        <div class="setting-group checkbox">
+                            <input type="checkbox" id="set-loss-items-decreased-death">
+                            <label for="set-loss-items-decreased-death">Decreased Item Loss on Death</label>
+                        </div>
+                    </div>
+
+                    <!-- Server Settings -->
+                    <div id="server-tab" class="settings-tab">
+                        <div class="setting-group">
+                            <label>Server Port</label>
+                            <input type="number" id="set-port" disabled>
+                            <p class="setting-help">Port cannot be changed after creation</p>
+                        </div>
+                        <div class="setting-group checkbox">
+                            <input type="checkbox" id="set-rcon-enabled">
+                            <label for="set-rcon-enabled">Enable RCON</label>
+                        </div>
+                        <div class="setting-group checkbox">
+                            <input type="checkbox" id="set-community">
+                            <label for="set-community">Community Server</label>
+                        </div>
+                        <div class="setting-group checkbox">
+                            <input type="checkbox" id="set-update-on-boot" checked>
+                            <label for="set-update-on-boot">Auto Update on Boot</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-overlay" onclick="closeLogsModal()"></div>
+        <div class="modal-content logs-modal">
+            <div class="modal-header">
+                <h2 id="logsTitle">Server Logs</h2>
+                <button class="close-btn" onclick="closeLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body logs-body">
                 <pre id="logContent" class="log-content">Loading logs...</pre>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeLogModal()">Close</button>
+                <button class="btn btn-secondary" onclick="closeLogsModal()">Close</button>
             </div>
         </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loadingText">Loading...</p>
     </div>
 
     <script src="/app.js"></script>
